@@ -52,10 +52,12 @@ ${context}`
 }
 
 function toAnthropicMessages(messages: ExplainChatConversationMessage[]) {
-  return messages.map(message => ({
-    role: message.role,
-    content: [{ type: 'text', text: message.text }],
-  }))
+  return messages
+    .filter(message => message.role !== 'system')
+    .map(message => ({
+      role: message.role as 'user' | 'assistant',
+      content: [{ type: 'text' as const, text: message.text }],
+    }))
 }
 
 export async function requestLineExplanation(
@@ -91,10 +93,7 @@ export async function requestLineExplanation(
     throw new Error('Claude did not return any text. Try asking again.')
   }
 
-  const followUpOptions =
-    response?.metadata?.annotations && Array.isArray(payload.followUpOptions)
-      ? payload.followUpOptions
-      : payload.followUpOptions
+  const followUpOptions = payload.followUpOptions
 
   return {
     assistantText,

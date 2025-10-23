@@ -18,7 +18,6 @@ const panelOpen = computed(() => chatStore.panelOpen.value)
 const sortMode = computed(() => chatStore.sortMode.value)
 const storedApiKey = computed(() => chatStore.apiKey.value)
 const apiKeyDraft = ref(storedApiKey.value)
-const apiKeyMissing = computed(() => !storedApiKey.value)
 
 watch(
   storedApiKey,
