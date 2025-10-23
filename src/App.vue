@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import PlaySidebar from './components/PlaySidebar.vue'
 import SceneControls from './components/SceneControls.vue'
 import SceneViewer from './components/SceneViewer.vue'
+import ExplainChatSessionsPanel from './components/ExplainChatSessionsPanel.vue'
 import { usePlayStore } from './stores/usePlayStore'
 
 const store = usePlayStore()
@@ -61,4 +62,5 @@ onMounted(() => {
       <p class="status error">{{ error }}</p>
     </div>
   </div>
+  <ExplainChatSessionsPanel />
 </template>

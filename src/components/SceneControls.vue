@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { usePlayStore } from '../stores/usePlayStore'
+import { useExplainChatStore } from '../stores/useExplainChatStore'
 
 const store = usePlayStore()
+const chatStore = useExplainChatStore()
 
 const acts = store.acts
 const scenes = store.scenes
@@ -9,12 +12,19 @@ const selectedActNumber = store.selectedActNumber
 const selectedSceneNumber = store.selectedSceneNumber
 const lineSearch = store.lineSearchModel
 
+const activeChatCount = computed(() => chatStore.sessions.length)
+const hasActiveChats = computed(() => activeChatCount.value > 0)
+
 function handleActSelect(actNumber: number) {
   store.selectAct(actNumber)
 }
 
 function handleSceneSelect(sceneNumber: number) {
   store.selectScene(sceneNumber)
+}
+
+function handleChatPanelToggle() {
+  chatStore.togglePanel()
 }
 </script>
 
@@ -58,6 +68,18 @@ function handleSceneSelect(sceneNumber: number) {
         type="search"
         placeholder="Filter dialogue or characters"
       />
+    </div>
+    <div class="control-group chat-summary">
+      <span class="control-label">Questions</span>
+      <button
+        type="button"
+        class="chat-summary__button"
+        :class="{ active: hasActiveChats }"
+        @click="handleChatPanelToggle"
+      >
+        <span>Active chats</span>
+        <span class="chat-summary__count">{{ activeChatCount }}</span>
+      </button>
     </div>
   </section>
 </template>
