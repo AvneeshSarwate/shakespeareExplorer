@@ -1,6 +1,11 @@
-import type { ExplainChatContextLine } from '../types/explain'
+import Anthropic from '@anthropic-ai/sdk'
+import type {
+  ExplainChatContextLine,
+  ExplainChatConversationMessage,
+} from '../types/explain'
 
 export type ExplainChatRequestPayload = {
+  apiKey: string
   playName: string
   actNumber: number
   sceneNumber: number
@@ -8,9 +13,8 @@ export type ExplainChatRequestPayload = {
   speaker: string
   lineText: string
   contextWindow: ExplainChatContextLine[]
-  userVisibleText: string
+  messages: ExplainChatConversationMessage[]
   followUpOptions: string[]
-  hiddenPrompt: string
 }
 
 export type ExplainChatResponsePayload = {
@@ -18,7 +22,10 @@ export type ExplainChatResponsePayload = {
   followUpOptions: string[]
 }
 
-const PLACEHOLDER_SYSTEM_MESSAGE = `You are a thoughtful Shakespeare tutor. Offer concise explanations of the selected line, drawing on the surrounding context and dramatic stakes. Keep the tone invitational and clarify any figurative language.`
+const MODEL_NAME = 'claude-3-5-sonnet-20241022'
+const MAX_TOKENS = 800
+
+const SYSTEM_PREAMBLE = `You are a thoughtful Shakespeare tutor. Offer clear, grounded explanations that connect language, rhetoric, and dramatic stakes. Focus on the play text provided and avoid spoilers beyond the surrounding context unless asked.`
 
 function renderContextSnippet(contextWindow: ExplainChatContextLine[]) {
   return contextWindow
@@ -29,11 +36,9 @@ function renderContextSnippet(contextWindow: ExplainChatContextLine[]) {
     .join('\n')
 }
 
-export function buildHiddenPrompt(
-  payload: Omit<ExplainChatRequestPayload, 'hiddenPrompt'>,
-) {
+export function buildSystemPrompt(payload: ExplainChatRequestPayload) {
   const context = renderContextSnippet(payload.contextWindow)
-  return `${PLACEHOLDER_SYSTEM_MESSAGE}
+  return `${SYSTEM_PREAMBLE}
 
 Play: ${payload.playName}
 Act: ${payload.actNumber}
@@ -43,23 +48,53 @@ Line number: ${payload.lineSentence}
 Line text: ${payload.lineText}
 
 Context window:
-${context}
+${context}`
+}
 
-Learner request: ${payload.userVisibleText}`
+function toAnthropicMessages(messages: ExplainChatConversationMessage[]) {
+  return messages.map(message => ({
+    role: message.role,
+    content: [{ type: 'text', text: message.text }],
+  }))
 }
 
 export async function requestLineExplanation(
   payload: ExplainChatRequestPayload,
 ): Promise<ExplainChatResponsePayload> {
-  // Placeholder implementation until real LLM wiring is available.
-  const { playName, speaker, lineSentence, followUpOptions } = payload
-  await new Promise(resolve => setTimeout(resolve, 500))
+  const apiKey = payload.apiKey.trim()
+  if (!apiKey) {
+    throw new Error('Missing Anthropic API key. Add it in the chat panel to continue.')
+  }
 
-  const assistantText = [
-    `Here’s a quick take on line ${lineSentence} from ${playName}.`,
-    `The speaker, ${speaker || 'Unknown'}, is grappling with the moment’s immediate tension.`,
-    `This placeholder response stands in for the eventual LLM output.`,
-  ].join(' ')
+  const client = new Anthropic({
+    apiKey,
+    dangerouslyAllowBrowser: true,
+  })
+
+  const systemPrompt = buildSystemPrompt(payload)
+  const conversation = toAnthropicMessages(payload.messages)
+
+  const response = await client.messages.create({
+    model: MODEL_NAME,
+    max_tokens: MAX_TOKENS,
+    temperature: 0.6,
+    system: systemPrompt,
+    messages: conversation,
+  })
+
+  const assistantText = response.content
+    .flatMap(block => (block.type === 'text' ? [block.text] : []))
+    .join('\n')
+    .trim()
+
+  if (!assistantText) {
+    throw new Error('Claude did not return any text. Try asking again.')
+  }
+
+  const followUpOptions =
+    response?.metadata?.annotations && Array.isArray(payload.followUpOptions)
+      ? payload.followUpOptions
+      : payload.followUpOptions
 
   return {
     assistantText,

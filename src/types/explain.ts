@@ -11,6 +11,8 @@ export type ExplainChatMessage = {
 
 export type ExplainChatContextLine = Pick<Line, 'globalIndex' | 'sentence' | 'character' | 'text'>
 
+export type ExplainChatConversationMessage = Pick<ExplainChatMessage, 'role' | 'text'>
+
 export type ExplainChatSessionStatus = 'open' | 'collapsed'
 
 export type ExplainChatSortMode = 'updated' | 'created' | 'play'

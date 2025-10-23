@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useExplainChatStore } from '../stores/useExplainChatStore'
 import { usePlayStore } from '../stores/usePlayStore'
 import type { ExplainChatSession, ExplainChatSortMode } from '../types/explain'
@@ -16,6 +16,17 @@ const sortOptions: Array<{ value: ExplainChatSortMode; label: string }> = [
 const sessions = computed(() => chatStore.sortedSessions.value)
 const panelOpen = computed(() => chatStore.panelOpen.value)
 const sortMode = computed(() => chatStore.sortMode.value)
+const storedApiKey = computed(() => chatStore.apiKey.value)
+const apiKeyDraft = ref(storedApiKey.value)
+const apiKeyMissing = computed(() => !storedApiKey.value)
+
+watch(
+  storedApiKey,
+  value => {
+    apiKeyDraft.value = value
+  },
+  { immediate: true },
+)
 
 function handleClose() {
   chatStore.closePanel()
@@ -67,6 +78,15 @@ async function handleReopen(session: ExplainChatSession) {
 function handleRemove(session: ExplainChatSession) {
   chatStore.closeSession(session.id)
 }
+
+function handleSaveKey() {
+  chatStore.setApiKey(apiKeyDraft.value)
+}
+
+function handleClearKey() {
+  apiKeyDraft.value = ''
+  chatStore.setApiKey('')
+}
 </script>
 
 <template>
@@ -91,6 +111,29 @@ function handleRemove(session: ExplainChatSession) {
         </header>
 
         <div class="chat-panel__body" role="list">
+          <section class="chat-panel__api" aria-label="Anthropic API key">
+            <label class="chat-panel__api-label" for="chat-panel-api-key">Anthropic API key</label>
+            <div class="chat-panel__api-row">
+              <input
+                id="chat-panel-api-key"
+                v-model="apiKeyDraft"
+                type="password"
+                class="chat-panel__input"
+                placeholder="sk-ant-..."
+              />
+              <div class="chat-panel__api-actions">
+                <button type="button" class="chat-panel__secondary" @click="handleSaveKey">
+                  Save
+                </button>
+                <button type="button" class="chat-panel__secondary" @click="handleClearKey">
+                  Clear
+                </button>
+              </div>
+            </div>
+            <p class="chat-panel__api-hint">
+              Provide an Anthropic API key to chat with Claude (kept only for this session; not stored).
+            </p>
+          </section>
           <p v-if="!sessions.length" class="chat-panel__empty">
             No chats yet — ask about a line to get started.
           </p>

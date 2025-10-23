@@ -8,7 +8,7 @@ import {
   type ExplainChatSession,
   type ExplainChatSortMode,
 } from '../types/explain'
-import { buildHiddenPrompt, requestLineExplanation } from '../services/explainChat'
+import { requestLineExplanation } from '../services/explainChat'
 
 type OpenSessionArgs = {
   playId: string
@@ -108,6 +108,7 @@ type ExplainChatStoreApi = {
   sortMode: ComputedRef<ExplainChatSortMode>
   pendingFocusSessionId: ComputedRef<string | null>
   openSessionId: ComputedRef<string | null>
+  apiKey: ComputedRef<string>
   getSessionById(sessionId: string): ExplainChatSession | null
   openSessionAtLine(args: OpenSessionArgs): string
   collapseSession(sessionId: string): void
@@ -121,6 +122,7 @@ type ExplainChatStoreApi = {
   requestFocus(sessionId: string): void
   clearPendingFocus(sessionId: string): void
   syncVisibility(args: VisibilitySyncArgs): void
+  setApiKey(key: string): void
 }
 
 export function useExplainChatStore() {
@@ -135,6 +137,7 @@ export function useExplainChatStore() {
   const panelOpen = ref(false)
   const sortMode = ref<ExplainChatSortMode>(loadSortMode())
   const pendingFocusSessionId = ref<string | null>(null)
+  const apiKey = ref('')
 
   function getSessionById(sessionId: string) {
     return sessions.find(session => session.id === sessionId) ?? null
@@ -198,6 +201,13 @@ export function useExplainChatStore() {
     const trimmed = userVisibleText.trim()
     if (!trimmed) return
 
+    const key = apiKey.value.trim()
+    if (!key) {
+      session.error = 'Add your Anthropic API key in the chat panel to start chatting.'
+      touchSession(session)
+      return
+    }
+
     const message: ExplainChatMessage = {
       id: createMessageId(),
       role: 'user',
@@ -210,20 +220,9 @@ export function useExplainChatStore() {
     session.hasHistory = true
     touchSession(session)
 
-    const hiddenPrompt = buildHiddenPrompt({
-      playName: session.playName,
-      actNumber: session.actNumber,
-      sceneNumber: session.sceneNumber,
-      lineSentence: session.lineSentence,
-      speaker: session.speaker,
-      lineText: session.lineText,
-      contextWindow: session.contextWindow,
-      userVisibleText: trimmed,
-      followUpOptions: session.followUpOptions,
-    })
-
     try {
       const response = await requestLineExplanation({
+        apiKey: key,
         playName: session.playName,
         actNumber: session.actNumber,
         sceneNumber: session.sceneNumber,
@@ -231,9 +230,11 @@ export function useExplainChatStore() {
         speaker: session.speaker,
         lineText: session.lineText,
         contextWindow: session.contextWindow,
-        userVisibleText: trimmed,
+        messages: session.messages.map(message => ({
+          role: message.role === 'assistant' ? 'assistant' : 'user',
+          text: message.text,
+        })),
         followUpOptions: session.followUpOptions,
-        hiddenPrompt,
       })
       const assistantMessage: ExplainChatMessage = {
         id: createMessageId(),
@@ -242,7 +243,10 @@ export function useExplainChatStore() {
         timestamp: Date.now(),
       }
       session.messages.push(assistantMessage)
-      session.followUpOptions = response.followUpOptions
+      session.followUpOptions =
+        response.followUpOptions?.length > 0
+          ? response.followUpOptions
+          : session.followUpOptions
       session.pending = false
       touchSession(session)
     } catch (error) {
@@ -325,6 +329,7 @@ export function useExplainChatStore() {
     sortMode: computed(() => sortMode.value),
     pendingFocusSessionId: computed(() => pendingFocusSessionId.value),
     openSessionId: computed(() => currentOpenSession.value?.id ?? null),
+    apiKey: computed(() => apiKey.value),
     getSessionById,
     openSessionAtLine(args: OpenSessionArgs) {
       return activateSession(args)
@@ -340,6 +345,9 @@ export function useExplainChatStore() {
     requestFocus,
     clearPendingFocus,
     syncVisibility,
+    setApiKey(value: string) {
+      apiKey.value = value.trim()
+    },
   }
 
   ;(useExplainChatStore as any)[explainChatStoreSymbol] = api
