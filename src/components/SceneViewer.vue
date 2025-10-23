@@ -14,6 +14,7 @@ import ExplainChat from './ExplainChat.vue'
 import { useExplainChatStore } from '../stores/useExplainChatStore'
 import type { ExplainChatContextLine, ExplainChatSession } from '../types/explain'
 import type { Line } from '../types/plays'
+import { buildContextWindowForPlay } from '../utils/contextWindow'
 
 const store = usePlayStore()
 const chatStore = useExplainChatStore()
@@ -133,19 +134,10 @@ watch(
 )
 
 function buildContextWindow(globalIndex: number): ExplainChatContextLine[] | null {
-  const scene = currentScene.value
-  if (!scene) return null
-  const sceneLines = scene.lines
-  const targetIndex = sceneLines.findIndex(line => line.globalIndex === globalIndex)
-  if (targetIndex === -1) return null
-  const start = Math.max(0, targetIndex - 20)
-  const end = Math.min(sceneLines.length - 1, targetIndex + 20)
-  return sceneLines.slice(start, end + 1).map(line => ({
-    globalIndex: line.globalIndex,
-    sentence: line.sentence,
-    character: line.character,
-    text: line.text,
-  }))
+  const play = currentPlay.value
+  if (!play) return null
+  const contextWindow = buildContextWindowForPlay(play, globalIndex, 20)
+  return contextWindow.length ? contextWindow : null
 }
 
 function sessionForLine(globalIndex: number) {
